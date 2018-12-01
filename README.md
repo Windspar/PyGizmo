@@ -1,5 +1,5 @@
-Gizmo
-=====
+PyGizmo
+=======
 * Work in progress
 * widget framework for pygame
 

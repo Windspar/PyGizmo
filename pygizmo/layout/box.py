@@ -4,13 +4,18 @@ from ..core import Anchor, Bin, Gizmo, Orientation
 from ..array import Bounds, Dimension
 
 class ChildBox(Gizmo):
-    def __init__(self, item, expand):
+    def __init__(self, item, h_expand, v_expand, center):
         Gizmo.__init__(self, item.bounds.copy())
-        self.expand = expand
         self.item = item
+        self.center = center
+        self.h_expand = h_expand
+        self.v_expand = v_expand
 
     def on_draw(self, surface, bounds=None):
         self.item.draw(surface, self.bounds)
+
+    def on_event(self, event):
+        self.item.event(event)
 
 class Box(Bin):
     @classmethod
@@ -40,19 +45,31 @@ class Box(Bin):
         Bin.__init__(self, bounds)
         self.item_bounds = Bounds(0,0,0,0)
         self.orientation = orientation
-        self.expand_count = 0
+        self.expand_count = {'h': 0, 'v': 0}
         self.anchor = anchor
         self.position = 0
         self.flip = flip
         self.boxes = []
         self.box = None
+        self.name = None
 
         self.spacing = spacing
         self.max_dimension = self.bounds.dimension
 
-    def add(self, item, expand=False):
+    def add(self, item, expand=False, expand_oppsite=False, center=False):
+        if isinstance(item, (tuple, list)):
+            for i in item:
+                self.add_item(i, expand, expand_oppsite, center)
+        else:
+            self.add_item(item, expand, expand_oppsite, center)
+
+    def add_item(self, item, expand=False, expand_oppsite=False, center=False):
         if isinstance(item, Gizmo):
-            child = ChildBox(item, expand)
+            if self.orientation == Orientation.vertical:
+                child = ChildBox(item, expand_oppsite, expand, center)
+            else:
+                child = ChildBox(item, expand, expand_oppsite, center)
+
             self.bind(child)
             if isinstance(item, Box):
                 self.boxes.append(child)
@@ -63,39 +80,47 @@ class Box(Bin):
         self._gizmos = []
         self.update()
 
-    def expand_and_shrink(self, attr, expand_count, orientation):
-        # Get the expanded bound attr
+    def expand_and_shrink(self):
         if self.box:
-            bound = self.box.bounds.attr[attr]
+            dimension = self.box.bounds.dimension
         else:
-            bound = self.bounds.attr[attr]
+            dimension = self.bounds.dimension
 
-        item_bound = self.item_bounds.attr[attr]
-        if self.expand_count > 0:
-            expand = (bound - item_bound) // expand_count
+        item_dim = self.item_bounds.dimension
+        expand = Dimension(0, 0)
+        if self.expand_count['h'] > 0:
+            expand.w = (dimension.w - item_dim.w) // self.expand_count['h']
 
-            if expand != 0:
-                for child in self._gizmos:
-                    if child.expand and child.item.show:
-                        ga = child.bounds.attr[attr]
-                        value = ga + expand
-                        n = expand
-                        # Box max bounds dimension
-                        if isinstance(child, Box):
-                            gamd = child.item.max_dimension.attr[attr]
-                            if value > gamd:
-                                value = gamd
-                                n = value - ga
+        if self.expand_count['v'] > 0:
+            expand.h = (dimension.h - item_dim.h) // self.expand_count['v']
 
-                        child.bounds.attr[attr] = value
+        if expand.w > 0 or expand.h > 0:
+            for child in self._gizmos:
+                if child.item.show:
+                    dim = child.bounds.dimension
+                    if child.h_expand and child.v_expand:
+                        value = dim + expand
+                    elif child.h_expand:
+                        value = dim
+                        value.w += expand.w
+                    elif child.v_expand:
+                        value = dim
+                        value.h += expand.h
 
-                        # Add expanded amount to item_bounds.
-                        self.item_bounds.attr[attr] += n
+                    n = Dimension(*expand)
+                    # Box max bounds dimension
+                    if isinstance(child.item, Box):
+                        max_dim = child.item.max_dimension
+                        if value.w > max_dim.w:
+                            value.w = max_dim.w
+                            n.w = value.w - dim.w
 
-                        # Update the oppisite direction
-                        if isinstance(child.item, Box):
-                            if orientation != child.item.orientation:
-                                child.item.expand_and_shrink(attr, 1, orientation)
+                        if value.h > max_dim.h:
+                            value.h = max_dim.h
+                            n.h = value.h - dim.h
+
+                    child.bounds.dimension = value
+                    self.item_bounds.dimension += n
 
     def get_children(self):
         if self.flip:
@@ -157,15 +182,18 @@ class Box(Bin):
     def update_item_bounds(self):
         width = []
         height = []
-        self.expand_count = 0
+        self.expand_count = {'h': 0, 'v': 0}
         for child in self._gizmos:
             if child.item.show:
                 if isinstance(child.item, Box):
                     child.item.update_item_bounds()
 
                 child.bounds = Bounds(child.item.bounds)
-                if child.expand:
-                    self.expand_count += 1
+                if child.v_expand:
+                    self.expand_count['v'] += 1
+
+                if child.h_expand:
+                    self.expand_count['h'] += 1
 
                 width.append(child.bounds.w)
                 height.append(child.bounds.h)
@@ -197,23 +225,40 @@ class Box(Bin):
         self.spread = {'w': bounds.w - self.item_bounds.w,
                        'h': bounds.h - self.item_bounds.h}
 
-        box_expand = 0
+        box_expand = {'v':0, 'h':0}
         height = []
         width = []
         for box in self.boxes:
             if box.item.show:
                 height.append(box.item.item_bounds.h)
                 width.append(box.item.item_bounds.w)
-                if box.expand:
-                    box_expand += 1
+                if box.v_expand:
+                    box_expand['v'] += 1
 
-        if box_expand > 0:
+                if box.h_expand:
+                    box_expand['h'] += 1
+
+        if box_expand['h'] > 0 or box_expand['v'] > 0:
             if self.orientation == Orientation.horizontal:
-                height = (self.max_dimension.h - max(height)) // box_expand
-                width = (self.max_dimension.w - sum(width)) // box_expand
+                if box_expand['v'] > 0:
+                    height = (self.max_dimension.h - max(height)) // box_expand['v']
+                else:
+                    height = 0
+
+                if box_expand['h'] > 0:
+                    width = (self.max_dimension.w - sum(width)) // box_expand['h']
+                else:
+                    width = 0
             else:
-                height = (self.max_dimension.h - sum(height)) // box_expand
-                width = (self.max_dimension.w - max(width))  // box_expand
+                if box_expand['v'] > 0:
+                    height = (self.max_dimension.h - sum(height)) // box_expand['v']
+                else:
+                    height = 0
+
+                if box_expand['h'] > 0:
+                    width = (self.max_dimension.w - max(width))  // box_expand['h']
+                else:
+                    width = 0
         else:
             height = 0
             width = 0
@@ -221,29 +266,42 @@ class Box(Bin):
         for box in self.boxes:
             if box.item.show:
                 b = box.item.item_bounds.dimension
-                if box.expand:
+                if box.h_expand and box.v_expand:
                     box.item.max_dimension = b + Dimension(width, height)
+                elif box.v_expand:
+                    box.item.max_dimension = b + Dimension(0, height)
+                elif box.h_expand:
+                    box.item.max_dimension = b + Dimension(width, 0)
                 else:
                     box.item.max_dimension = b
 
                 box.item.update_max_dimension()
 
     def update_position(self):
-        if self.orientation == Orientation.horizontal:
-            self.expand_and_shrink('w', self.expand_count, self.orientation)
-        else:
-            self.expand_and_shrink('h', self.expand_count, self.orientation)
-
-        print('Dimension', self.max_dimension)
+        self.expand_and_shrink()
 
         x, y = self.get_position()
         children = self.get_children()
-        print('Parent', x, y, self.bounds)
 
         for child in children:
             if child.item.show:
-                child.bounds.x = x
-                child.bounds.y = y
+                if not isinstance(child.item, Box) and child.center:
+                    center = (self.bounds.w - child.item.bounds.w) // 2
+                    if self.orientation == Orientation.vertical:
+                        child.bounds.x = x + center
+                        child.bounds.y = y
+                    else:
+                        child.bounds.x = x
+                        child.bounds.y = y + center
+                else:
+                    child.bounds.x = x
+                    child.bounds.y = y
+
+                #print('Updating Screen Bounds', child.bounds)
+                #child.item.update_screen_bounds(child.bounds)
+                child.item.screen_bounds = child.bounds
+                #print('Child Screen Bounds', child.item.screen_bounds)
+
                 if isinstance(child.item, Box):
                     child.item.update_position()
 

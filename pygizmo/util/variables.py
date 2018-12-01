@@ -1,16 +1,16 @@
 
-class CallVariable:
+class FunctionVariable:
     def __init__(self, value, callback):
-        self.variable = value
+        self.read_value = value
         self.callback = callback
 
     def __call__(self, value=None):
         if value:
-            self.variable = value
+            self.read_value = value
             self.callback()
         else:
-            return self.variable
+            return self.read_value
 
     def clear(self):
-        self.variable = None
+        self.read_value = None
         self.callback()

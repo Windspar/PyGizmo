@@ -2,10 +2,9 @@ import pygame
 
 
 class Carrot:
-    def __init__(self, font, color, carrot=None):
-        h = font.get_linesize() - 2
-        self.image = pygame.Surface((1, h))
-        self.image.fill(color)
+    def __init__(self, font, carrot=None):
+        self.update_font(font)
+        font.add_callback(self.update_font)
 
         if carrot:
             self.carrot = list(carrot)
@@ -34,3 +33,8 @@ class Carrot:
             surface.blit(self.image, (x, y + 1))
             if self.inverse_letter:
                 surface.blit(self.inverse_letter, (x, y))
+
+    def update_font(self, font):
+        h = font.get_linesize() - 2
+        self.image = pygame.Surface((1, h))
+        self.image.fill(font.foreground.read_value)

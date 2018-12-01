@@ -41,6 +41,7 @@ class Gizmo:
         if self.enable and self.show and not self.invisable:
             if event.type == pygame.MOUSEMOTION:
                 self._hover = self.screen_bounds.collidepoint(*event.pos)
+                #print(self._hover, self.screen_bounds,  event.pos)
 
             self.on_event(event)
 
@@ -101,7 +102,10 @@ class Gizmo:
             self.bounds.right = bounds.right
             self.bounds.centery = bounds.centery
 
-    def update_screen_bounds(self):
+    def update_screen_bounds(self, bounds=None):
+        if bounds is None:
+            bounds = self.bounds
+
         if self.parent:
-            self.screen_bounds = Bounds(self.bounds)
+            self.screen_bounds = Bounds(bounds)
             self.screen_bounds.topleft = self.get_screen_position()

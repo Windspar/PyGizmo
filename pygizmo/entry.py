@@ -1,26 +1,23 @@
 import pygame
-from .label import Label
 from .array import Bounds, Point, Dimension
-from .core import Carrot, Gizmo, Recall
+from .core import Gizmo, ColorFrame, Font
+from .core.text import Carrot, Recall, Text
 
-
-class EntryColor:
-    def __init__(self):
-        self.text = pygame.Color('white')
-        self.hover = pygame.Color('aliceblue')
-        self.border = pygame.Color('darkblue')
-        self.selected = pygame.Color('lightskyblue')
-        self.background = pygame.Color('dodgerblue')
+DEFAULT_ENTRY_COLOR = ColorFrame(None,
+                                 pygame.Color('dodgerblue'),
+                                 pygame.Color('aliceblue'),
+                                 pygame.Color('lightskyblue'),
+                                 pygame.Color('darkblue'))
 
 class Entry(Gizmo):
     # default font
-    font = pygame.font.Font(None, 16)
+    font = Font()
 
     def __init__(self, callback,
                  font = None,
                  dimension=None,
                  position=(0,0),
-                 colors=EntryColor(),
+                 colors=DEFAULT_ENTRY_COLOR,
                  box=False):
 
         if font is None:
@@ -38,12 +35,13 @@ class Entry(Gizmo):
 
         Gizmo.__init__(self, (*position, *dimension))
         if box:
-            position = Point(1, (self.bounds.h - font.get_linesize()) // 2)
+            position = Point(2, (self.bounds.h - font.get_linesize()) // 2)
         else:
-            position = Point(self.bounds.x + 2, (self.bounds.h - font.get_linesize()) // 2 + self.bounds.y)
+            position = Point(1, (self.bounds.h - font.get_linesize()) // 2)
 
-        self.label = Label("", font, colors.text, position.copy())
-        self.carrot = Carrot(font, colors.text)
+        self.text = Text(self, font)
+        self.position = Bounds(position)
+        self.carrot = Carrot(font)
         self.carrot.position = position.copy()
         self.callback = callback
         self.recall = Recall()
@@ -129,8 +127,8 @@ class Entry(Gizmo):
         if self._selected:
             self.carrot.draw(surface)
 
-        self.label.color(foreground)
-        self.label.draw(surface)
+        self.text.set_foreground(foreground)
+        self.text.on_draw(surface, self.position)
 
     def on_event(self, event):
         if event.type == pygame.KEYDOWN and self._selected:
@@ -139,15 +137,15 @@ class Entry(Gizmo):
             if ctrl == 0 and 31 < event.key < 127:
                 self.buffer.insert(self.carrot.pos, event.unicode)
                 self.carrot.pos += 1
-                self.update_label()
+                self.update_text()
             elif ctrl == 0:
                 if self.key_event[pygame.KMOD_NONE].get(event.key, False):
                     self.key_event[pygame.KMOD_NONE][event.key]()
-                    self.update_label()
+                    self.update_text()
 
-    def update_label(self):
+    def update_text(self):
         if len(self.buffer) > 0:
-            font = self.label.font()
+            font = self.text.font.read_value
             text = ''.join(self.buffer)
 
             if self.carrot.pos > self.offset.y:
@@ -156,23 +154,23 @@ class Entry(Gizmo):
                 self.offset.x = self.carrot.pos
 
             width = self.bounds.w - 3
-            while font.size(text[self.offset.x:self.offset.y])[0] < width and self.offset.x > 0:
+            while font.text_size(text[self.offset.x:self.offset.y])[0] < width and self.offset.x > 0:
                 self.offset.x -= 1
 
-            while font.size(text[self.offset.x:self.offset.y])[0] > width and self.offset.x < self.carrot.pos:
+            while font.text_size(text[self.offset.x:self.offset.y])[0] > width and self.offset.x < self.carrot.pos:
                 self.offset.x += 1
 
-            while font.size(text[self.offset.x:self.offset.y])[0] < width and self.offset.y < len(self.buffer):
+            while font.text_size(text[self.offset.x:self.offset.y])[0] < width and self.offset.y < len(self.buffer):
                 self.offset.y += 1
 
-            while font.size(text[self.offset.x:self.offset.y])[0] > width:
+            while font.text_size(text[self.offset.x:self.offset.y])[0] > width:
                 self.offset.y -= 1
 
-            self.label.text(text[self.offset.x:self.offset.y])
+            self.text(text[self.offset.x:self.offset.y])
 
-            self.carrot.left = font.size(text[self.offset.x:self.carrot.pos])[0]
+            self.carrot.left = font.text_size(text[self.offset.x:self.carrot.pos])[0]
         else:
-            self.label.text.clear()
+            self.text.clear()
             self.keydown_delete()
 
 class EntryBox(Entry):
@@ -180,7 +178,7 @@ class EntryBox(Entry):
                  font = None,
                  dimension=None,
                  position=(0,0),
-                 colors=EntryColor()):
+                 colors=DEFAULT_ENTRY_COLOR                 ):
 
         Entry.__init__(self, callback, font, dimension, position, colors, True)
         dim = self.bounds.dimension + 4
@@ -204,7 +202,7 @@ class EntryBox(Entry):
         if self._selected:
             self.carrot.draw(self.text_background)
 
-        self.label.draw(self.text_background)
+        self.text.on_draw(self.text_background, self.position)
         self.text_border.blit(self.text_background, (2,2))
         surface.blit(self.text_border, bounds)
 

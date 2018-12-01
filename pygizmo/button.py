@@ -1,36 +1,32 @@
 import pygame
-from .label import Label
-from .core import Anchor, Gizmo
+from .core import Anchor, Gizmo, ColorFrame, Font
+from .core.text import Text
 from .array import Bounds
 
 pygame.init()
 class Button(Gizmo):
-    default_font = pygame.font.Font(None, 16)
+    default_font = Font()
 
-    def __init__(self, label, bounds, callback, pydata=None, anchor=Anchor.H.center):
+    def __init__(self, text, bounds, callback, pydata=None, anchor=Anchor.H.center):
         Gizmo.__init__(self, bounds)
-        if isinstance(label, str):
-            self.label = Label(label, pygame.font.Font(None, 16), (255,255,255))
-        else:
-            self.label = label
-
+        self.text = Text(self, Font(), text)
         self.anchor = anchor
         self.callback = callback
         self.pydata = pydata
-        self.bg_color = pygame.Color('mediumblue')
-        self.hover_color = pygame.Color('dodgerblue')
+        self.color = ColorFrame(background = pygame.Color('mediumblue'),
+                                hover = pygame.Color('dodgerblue'))
 
     def on_draw(self, surface, bounds):
         if bounds is None:
             bounds = self.bounds
 
         if self._hover:
-            surface.fill(self.hover_color, bounds)
+            surface.fill(self.color.hover, bounds)
         else:
-            surface.fill(self.bg_color, bounds)
+            surface.fill(self.color.background, bounds)
 
-        self.label.bounds.center = self.bounds.center
-        self.label.draw(surface)
+        self.text.bounds.center = self.bounds.center
+        self.text.on_draw(surface)
 
     def on_event(self, event):
         if event.type == pygame.MOUSEBUTTONUP:

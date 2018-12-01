@@ -15,6 +15,10 @@ class Bin(Gizmo):
         gizmo._id = self.get_id()
         self._gizmos.append(gizmo)
 
+    def bind_all(self, gizmos):
+        for gizmo in gizmos:
+            self.bind(gizmo)
+
     def draw(self, surface, bounds=None):
         if not self.invisable:
             if not self.enable and self.show:
@@ -41,7 +45,7 @@ class Bin(Gizmo):
         self._bin_id += 1
         return id
 
-    def update_screen_bounds(self):
-        Gizmo.update_screen_bounds(self)
+    def update_screen_bounds(self, bounds=None):
+        Gizmo.update_screen_bounds(self, bounds)
         for g in self._gizmos:
-            g.update_screen_bounds()
+            g.update_screen_bounds(bounds)

@@ -15,8 +15,10 @@ from ..util import Attr
 # Bounds(Rect)
 
 class Bounds(np.ndarray):
-    def __new__(cls, x, y=None, w=None, h=None):
-        if isinstance(x, (tuple, list)):
+    def __new__(cls, x=None, y=None, w=None, h=None):
+        if x is None:
+            obj = np.asarray((0, 0, 0, 0)).view(cls)
+        elif isinstance(x, (tuple, list)):
             if len(x) == 4:
                 obj = np.asarray(x).view(cls)
             else:
@@ -27,6 +29,8 @@ class Bounds(np.ndarray):
             obj = np.asarray(tuple(x)).view(cls)
         elif isinstance(x, Dimension):
             obj = np.asarray((0, 0, x.w, x.h)).view(cls)
+        elif isinstance(x, Point):
+            obj = np.asarray((x.x, x.y, 0, 0)).view(cls)
         elif w is None:
             obj = np.asarray((0, 0, x, y)).view(cls)
         else:

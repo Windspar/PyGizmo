@@ -1,6 +1,6 @@
 from .bin import Bin
-from .carrot import Carrot
-from .recall import Recall
+from .color import ColorFrame
+from .display import Display
 from .enums import Anchor, Orientation
 from .gizmo import Gizmo
-from .display import Display
+from .font import Font
